@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.baileys_auth/
+.env*
+!.env.local.example
+*.tsbuildinfo
+.DS_Store
+*.log
+/alpo.zip
