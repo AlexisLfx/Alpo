@@ -10,10 +10,6 @@ import { generateEvidenceHash } from '@/lib/hash'
 import { sendAlertToTutor } from '@/lib/whatsapp'
 import { storeEvidenceOnChain } from '@/lib/monad'
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
-
 export async function POST(req: NextRequest) {
   let tmpPath: string | null = null
 
@@ -37,6 +33,7 @@ export async function POST(req: NextRequest) {
       tmpPath = join(tmpdir(), `alpo-audio-${Date.now()}.${ext}`)
       writeFileSync(tmpPath, buffer)
 
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
       const response = await groq.audio.transcriptions.create({
         file: createReadStream(tmpPath),
         model: 'whisper-large-v3',
@@ -56,13 +53,16 @@ export async function POST(req: NextRequest) {
       console.error('[monad] Error registrando evidencia:', e instanceof Error ? e.message : e)
     }
 
-    sendAlertToTutor({
-      transcription,
-      detected,
-      detectedPhrases: phrases,
-      hash,
-      txHash: registration?.txHash,
-    }).catch((e) => console.error('[whatsapp] Error enviando alerta:', e.message))
+    let alertStatus: 'sent' | 'failed' | 'not_needed' = 'not_needed'
+    if (detected) {
+      try {
+        await sendAlertToTutor({ transcription, detectedPhrases: phrases, hash, txHash: registration?.txHash })
+        alertStatus = 'sent'
+      } catch (e) {
+        alertStatus = 'failed'
+        console.error('[whatsapp] Error enviando alerta:', e instanceof Error ? e.message : e)
+      }
+    }
 
     return NextResponse.json({
       transcription,
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       hash,
       timestamp,
       registration,
+      alertStatus,
     })
   } catch (err) {
     console.error('[/api/analyze]', err)

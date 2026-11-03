@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AudioUploader from '@/components/AudioUploader'
 import VisualMonitor from '@/components/VisualMonitor'
+import WhatsAppLink from '@/components/WhatsAppLink'
 import type { AnalysisResult } from '@/lib/types'
 
 export default function HomePage() {
@@ -64,6 +65,8 @@ export default function HomePage() {
           la evidencia de forma inmutable en Monad.
         </p>
       </div>
+
+      <WhatsAppLink />
 
       {/* Monitoreo visual */}
       <VisualMonitor />

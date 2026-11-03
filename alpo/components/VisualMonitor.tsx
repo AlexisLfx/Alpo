@@ -12,18 +12,27 @@ type ScreenResult = {
   chatTotalWords?: number;
   detected?: boolean;
   detectedPhrases?: string[];
+  alertStatus?: 'sent' | 'failed' | 'duplicate' | 'not_needed';
   error?: string;
+  captureMode?: 'app' | 'web';
 };
 
-// Captura únicamente el historial del chat privado de Roblox.
-function capturarSoloChat(video: HTMLVideoElement): string {
+type CaptureMode = 'web' | 'app' | 'sidebar';
+
+// Recorta el historial de la conversación según la ventana seleccionada.
+function capturarSoloChat(video: HTMLVideoElement, mode: CaptureMode): string {
   const ancho = video.videoWidth;
   const alto = video.videoHeight;
 
-  const x = Math.round(ancho * 0.648);
-  const y = Math.round(alto * 0.588);
-  const width = Math.round(ancho * 0.134);
-  const height = Math.round(alto * 0.284);
+  const region = mode === 'app'
+    ? { x: 0.405, y: 0.09, width: 0.585, height: 0.85 }
+    : mode === 'sidebar'
+      ? { x: 0, y: 0, width: 0.4, height: 0.4 }
+      : { x: 0.648, y: 0.588, width: 0.134, height: 0.284 };
+  const x = Math.round(ancho * region.x);
+  const y = Math.round(alto * region.y);
+  const width = Math.round(ancho * region.width);
+  const height = Math.round(alto * region.height);
 
   const canvas = document.createElement('canvas');
 
@@ -80,14 +89,16 @@ export default function VisualMonitor() {
     try {
       setError('');
 
-      const image = capturarSoloChat(video);
+      const image = capturarSoloChat(video, 'web');
+      const appImage = capturarSoloChat(video, 'app');
+      const sidebarImage = capturarSoloChat(video, 'sidebar');
 
       const response = await fetch('/api/screen', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ image }),
+        body: JSON.stringify({ image, appImage, sidebarImage }),
       });
 
       if (!response.ok) {
@@ -114,7 +125,7 @@ export default function VisualMonitor() {
       setScans((previous) => previous + 1);
 
       if (result.chatDetected) {
-        setMessage('Chat privado detectado');
+        setMessage(result.alertStatus === 'sent' ? 'Alerta enviada por WhatsApp' : result.alertStatus === 'failed' ? 'Riesgo detectado; no se pudo enviar la alerta por WhatsApp' : result.captureMode === 'app' ? 'Chat de la aplicación detectado' : 'Chat del juego detectado');
       } else {
         setMessage('Esperando mensajes del chat...');
       }
@@ -245,6 +256,10 @@ export default function VisualMonitor() {
           {monitoring ? 'Activo' : 'Inactivo'}
         </span>
       </div>
+
+      <p className="text-sm text-gray-500">
+        Comparte la ventana de Roblox o la pantalla donde juegas. ALPO detectará el chat automáticamente.
+      </p>
 
       <div className="flex flex-wrap gap-3">
         {!monitoring ? (

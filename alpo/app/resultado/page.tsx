@@ -152,7 +152,7 @@ export default function ResultadoPage() {
             { label: 'Transcripción completada', done: true },
             { label: 'Detección ejecutada', done: true },
             { label: 'Hash generado', done: true },
-            { label: 'Alerta al tutor', done: result.detected },
+            { label: result.alertStatus === 'failed' ? 'No se pudo enviar la alerta por WhatsApp' : 'Alerta enviada por WhatsApp', done: result.alertStatus === 'sent' },
             { label: 'Registrado en Monad', done: !!registration },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3">

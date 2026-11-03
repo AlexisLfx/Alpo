@@ -2,3 +2,5 @@ node_modules/
 .next/
 .env.local
 .baileys_auth/
+
+.baileys_sender_auth/

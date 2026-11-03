@@ -4,6 +4,7 @@ export interface AnalysisResult {
   detectedPhrases: string[]
   hash: string
   timestamp: number
+  alertStatus?: 'sent' | 'failed' | 'not_needed'
   registration: MonadRegistration | null
 }
 

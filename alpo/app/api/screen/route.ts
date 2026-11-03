@@ -3,9 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createWorker } from 'tesseract.js'
 import path from 'node:path'
 import { detectRiskPhrases } from '@/lib/detection'
+import { sendAlertToTutor } from '@/lib/whatsapp'
+import { createHash } from 'node:crypto'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
+
+const shared = globalThis as unknown as { __alpoScreenAlerts?: Map<string, number> }
+const recentAlerts = shared.__alpoScreenAlerts ??= new Map<string, number>()
 
 type Palabra = {
   text: string
@@ -65,6 +70,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const image = body.image
+    const appImage = body.appImage
+    const sidebarImage = body.sidebarImage
 
     if (
       typeof image !== 'string' ||
@@ -96,10 +103,19 @@ export async function POST(request: NextRequest) {
 
     let palabras: Palabra[] = []
     let textoCompleto = ''
+    let captureMode: 'app' | 'web' = 'web'
 
     try {
+      if (typeof sidebarImage === 'string' && sidebarImage.startsWith('data:image/') &&
+          typeof appImage === 'string' && appImage.startsWith('data:image/')) {
+        const sidebar = await worker.recognize(sidebarImage)
+        const text = sidebar.data.text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        // Require multiple navigation labels so ordinary chat text does not change the crop.
+        const indicators = [/\bchat\b/, /\bbuscar\b/, /\bformar\b|\bequipo\b/, /\bcomunidades\b/]
+        if (indicators.filter((pattern) => pattern.test(text)).length >= 2) captureMode = 'app'
+      }
       const resultado = await worker.recognize(
-        image,
+        captureMode === 'app' ? appImage : image,
         {},
         { blocks: true },
       )
@@ -126,8 +142,9 @@ export async function POST(request: NextRequest) {
       )
 
       // Respaldo si Tesseract no devuelve bloques.
-      if (palabras.length === 0 && resultado.data.words) {
-        palabras = resultado.data.words.map((palabra: any) => ({
+      const legacyWords = (resultado.data as typeof resultado.data & { words?: any[] }).words
+      if (palabras.length === 0 && legacyWords) {
+        palabras = legacyWords.map((palabra: any) => ({
           text: palabra.text,
           confidence: palabra.confidence,
           bbox: {
@@ -160,6 +177,26 @@ export async function POST(request: NextRequest) {
     console.log('[ALPO RIESGO] Detectado:', riesgo.detected)
     console.log('[ALPO RIESGO] Frases:', riesgo.phrases)
 
+    let alertStatus: 'sent' | 'failed' | 'duplicate' | 'not_needed' = 'not_needed'
+    if (riesgo.detected) {
+      const now = Date.now()
+      recentAlerts.forEach((time, key) => { if (now - time > 60000) recentAlerts.delete(key) })
+      const key = createHash('sha256').update(chatText).digest('hex')
+      if (recentAlerts.has(key)) {
+        alertStatus = 'duplicate'
+      } else {
+        recentAlerts.set(key, now)
+        try {
+          await sendAlertToTutor({ transcription: chatText, detectedPhrases: riesgo.phrases, source: 'pantalla' })
+          alertStatus = 'sent'
+        } catch (error) {
+          recentAlerts.delete(key)
+          alertStatus = 'failed'
+          console.error('[whatsapp] Error enviando alerta visual:', error instanceof Error ? error.message : error)
+        }
+      }
+    }
+
     return NextResponse.json({
       text: textoCompleto,
       words: palabras,
@@ -176,8 +213,10 @@ export async function POST(request: NextRequest) {
 
       chatTotalWords: palabras.length,
 
+      captureMode,
       detected: riesgo.detected,
       detectedPhrases: riesgo.phrases,
+      alertStatus,
 
       timestamp: new Date().toISOString(),
       source: 'ocr-chat-recortado',

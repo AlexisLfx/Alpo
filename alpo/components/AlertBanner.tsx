@@ -18,7 +18,7 @@ export default function AlertBanner({ phrases }: AlertBannerProps) {
           <p className="text-red-600 font-bold text-lg uppercase tracking-wide">
             Alerta de Riesgo
           </p>
-          <p className="text-red-400 text-sm">Tutor notificado — Evidencia generada</p>
+          <p className="text-red-400 text-sm">Revisa el resultado y el estado de la alerta</p>
         </div>
       </div>
       <div className="mt-3">
