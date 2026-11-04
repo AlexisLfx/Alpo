@@ -1,6 +1,14 @@
 node_modules/
 .next/
 .env.local
+.env*.local
 .baileys_auth/
-
 .baileys_sender_auth/
+*.traineddata
+*.png
+*.jpg
+*.jpeg
+*.tsbuildinfo
+*.log
+.DS_Store
+vision/capturas/

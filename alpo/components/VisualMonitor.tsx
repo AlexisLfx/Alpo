@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -129,13 +128,6 @@ export default function VisualMonitor() {
       } else {
         setMessage('Esperando mensajes del chat...');
       }
-
-      console.log('[ALPO MONITOR] Captura procesada');
-      console.log('[ALPO CHAT] Detectado:', result.chatDetected);
-      console.log('[ALPO CHAT] Texto:', text);
-      console.log('[ALPO OCR] Palabras:', words);
-      console.log('[ALPO RIESGO] Detectado:', result.detected);
-      console.log('[ALPO RIESGO] Frases:', result.detectedPhrases);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error desconocido';
@@ -167,8 +159,6 @@ export default function VisualMonitor() {
     setMonitoring(false);
     setMessage('Monitoreo detenido');
     scanningRef.current = false;
-
-    console.log('[ALPO MONITOR] Monitoreo detenido');
   };
 
   const startMonitoring = async () => {
@@ -207,8 +197,6 @@ export default function VisualMonitor() {
       intervalRef.current = setInterval(() => {
         scanScreen();
       }, 3000);
-
-      console.log('[ALPO MONITOR] Monitoreo iniciado');
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Error desconocido';

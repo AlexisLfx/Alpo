@@ -1,4 +1,3 @@
-
 export type Region = {
   x: number
   y: number
@@ -15,8 +14,6 @@ export async function detectarPaneles(
   if (!imageData || !imageData.startsWith('data:image/')) {
     throw new Error('La imagen recibida no es válida')
   }
-
-  console.log('[ALPO VISION] OpenCV desactivado temporalmente')
 
   return []
 }
