@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createWorker } from 'tesseract.js'
 import path from 'node:path'
@@ -93,9 +92,6 @@ export async function POST(request: NextRequest) {
       'index.js',
     )
 
-    console.log('[ALPO OCR] Worker:', workerPath)
-    console.log('[ALPO OCR] Procesando recorte exclusivo del chat')
-
     const worker = await createWorker('spa+eng', 1, {
       workerPath,
       workerBlobURL: false,
@@ -114,6 +110,7 @@ export async function POST(request: NextRequest) {
         const indicators = [/\bchat\b/, /\bbuscar\b/, /\bformar\b|\bequipo\b/, /\bcomunidades\b/]
         if (indicators.filter((pattern) => pattern.test(text)).length >= 2) captureMode = 'app'
       }
+
       const resultado = await worker.recognize(
         captureMode === 'app' ? appImage : image,
         {},
@@ -159,29 +156,24 @@ export async function POST(request: NextRequest) {
       await worker.terminate()
     }
 
-    const chatText = extraerTexto(palabras)
+    let chatText = extraerTexto(palabras)
+    // Respaldo de texto si la agrupación de líneas no produjo texto pero Tesseract reconoció caracteres
+    if (!chatText && textoCompleto.trim()) {
+      chatText = textoCompleto.trim()
+    }
 
-    console.log('[ALPO OCR] Palabras reconocidas:', palabras.length)
-    console.log('[ALPO OCR] Texto completo:', textoCompleto)
-    console.log('[ALPO CHAT] Texto del recorte:', chatText)
-
-    // El recorte ya corresponde exclusivamente a la ventana privada.
-    const chatDetected = palabras.length > 0 && chatText.length > 0
+    const chatDetected = chatText.length > 0
 
     const riesgo = chatDetected
       ? detectRiskPhrases(chatText)
-      : { detected: false, phrases: [] }
-
-    console.log('[ALPO CHAT] Detectado:', chatDetected)
-    console.log('[ALPO CHAT] Total de palabras:', palabras.length)
-    console.log('[ALPO RIESGO] Detectado:', riesgo.detected)
-    console.log('[ALPO RIESGO] Frases:', riesgo.phrases)
+      : { detected: false, phrases: [], categories: [] }
 
     let alertStatus: 'sent' | 'failed' | 'duplicate' | 'not_needed' = 'not_needed'
     if (riesgo.detected) {
       const now = Date.now()
       recentAlerts.forEach((time, key) => { if (now - time > 60000) recentAlerts.delete(key) })
       const key = createHash('sha256').update(chatText).digest('hex')
+
       if (recentAlerts.has(key)) {
         alertStatus = 'duplicate'
       } else {
@@ -192,7 +184,7 @@ export async function POST(request: NextRequest) {
         } catch (error) {
           recentAlerts.delete(key)
           alertStatus = 'failed'
-          console.error('[whatsapp] Error enviando alerta visual:', error instanceof Error ? error.message : error)
+          console.error('[ALPO SCREEN WHATSAPP] Error enviando alerta visual por WhatsApp:', error instanceof Error ? error.message : error)
         }
       }
     }
